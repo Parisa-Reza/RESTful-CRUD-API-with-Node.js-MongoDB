@@ -86,11 +86,11 @@ router.get("/", async (req, res) => {
 });
 
 
-// get use profile
+// get user profile
 
 router.get("/profile",authenticateToken, async (req, res) => {
   try {
-    const id = req.params.id;
+    const id = req.user._id;
     const user = await User.findById({ _id: id });
     if (user) {
       res.json(user);
