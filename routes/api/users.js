@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const authenticateToken= require('../../middleware/auth.js')
+const authenticateToken = require("../../middleware/auth.js");
 const User = require("../../models/User");
 
 // Create a new user
@@ -27,11 +27,12 @@ router.post("/", async (req, res) => {
   }
 });
 
-// login user (type)
+
+// login user (access token)
 
 router.post("/login", async (req, res) => {
   try {
-    const { type, email, password } = req.body;
+    const { type, email, password, refreshToken } = req.body;
     if (type === "email") {
       const user = await User.findOne({ email: email });
       if (!user) {
@@ -48,7 +49,7 @@ router.post("/login", async (req, res) => {
             },
             process.env.JWT_SECRET,
             {
-              expiresIn: '1d',
+              expiresIn: "1d",
             }
           );
 
@@ -59,14 +60,58 @@ router.post("/login", async (req, res) => {
             },
             process.env.JWT_SECRET,
             {
-              expiresIn: '3d',
+              expiresIn: "3d",
             }
           );
           const userObj = user.toJSON();
-          userObj['accessToken']=accessToken;
-          userObj['refreshToken']=refreshToken;
+          userObj["accessToken"] = accessToken;
+          userObj["refreshToken"] = refreshToken;
           res.json(userObj);
         }
+      }
+    } else {
+      
+// login user (refresh token)
+      if (!refreshToken) {
+        res.status(401).json({ message: "refresh token not found" });
+      } else {
+        jwt.verify(refreshToken, process.env.JWT_SECRET, async(err, payload) => {
+          if (err) {
+            res.status(401).json({ message: "unauthorized" });
+            return
+          } else {
+            const user = await User.findById(payload._id);
+            if (user) {
+              const accessToken = jwt.sign(
+                {
+                  email: user.email,
+                  _id: user._id,
+                },
+                process.env.JWT_SECRET,
+                {
+                  expiresIn: "1d",
+                }
+              );
+
+              const refreshToken = jwt.sign(
+                {
+                  email: user.email,
+                  _id: user._id,
+                },
+                process.env.JWT_SECRET,
+                {
+                  expiresIn: "3d",
+                }
+              );
+              const userObj = user.toJSON();
+              userObj["accessToken"] = accessToken;
+              userObj["refreshToken"] = refreshToken;
+              res.json(userObj);
+            }else{
+                 res.status(401).json({ message: "unauthorized" });
+            }
+          }
+        });
       }
     }
   } catch (error) {
@@ -85,10 +130,9 @@ router.get("/", async (req, res) => {
   }
 });
 
-
 // get user profile
 
-router.get("/profile",authenticateToken, async (req, res) => {
+router.get("/profile", authenticateToken, async (req, res) => {
   try {
     const id = req.user._id;
     const user = await User.findById({ _id: id });
@@ -101,7 +145,6 @@ router.get("/profile",authenticateToken, async (req, res) => {
     res.status(500).json({ message: "server error" });
   }
 });
-
 
 // get one user by ID
 
@@ -118,7 +161,6 @@ router.get("/:id", async (req, res) => {
     res.status(500).json({ message: "server error" });
   }
 });
-
 
 // update a user by ID
 
